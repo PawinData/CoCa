@@ -1,0 +1,119 @@
+---
+title: "Air"
+author: "Ariel Liang"
+date: "2019???12???12???"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Prepation
+
+```{r preparation, include=TRUE}
+# import raw data
+DATA <- read.csv("PRSA_Data_Aotizhongxin_20130301-20170228.csv")
+# select interesting variables
+DATA_cleaned <- DATA[,c(6:15,17)]
+# replace missing values with the column averages
+n <- nrow(DATA_cleaned)
+for (j in 1:ncol(DATA_cleaned))
+{
+  DATA_cleaned[is.na(DATA_cleaned[,j]),j]<-mean(DATA_cleaned[,j],na.rm=TRUE)
+  # normalize each column
+  v <- DATA_cleaned[,j]
+  DATA_cleaned[,j] <- (v-mean(v))/sd(v)
+}
+# split (X,Y)
+X <- DATA_cleaned[,2:ncol(DATA_cleaned)]
+Y <- matrix(DATA_cleaned[,1],ncol=1)
+m <- ncol(X)
+cat("There are", n, "observations and", m, "features.")
+# save cleaned data and remove redundant objects
+save(DATA_cleaned, file="DATA_cleaned.RData")
+rm(DATA,v,j)
+```
+
+```{r statistical dependency, include=TRUE}
+# print out the first few rows of data
+head(DATA_cleaned)
+# scatterplots
+par(mfrow=c(2,5))
+for (j in 1:10)
+{
+  plot(X[,j],Y,xlab=paste("X[ ,",j,"]"))
+}
+rm(j)
+```
+
+## MDL Approach
+
+```{r MDL, include=TRUE}
+# import functions to calculate MDL scores
+source("L_causal.R")
+source("L_confounded.R")
+# start timing
+start_time <- Sys.time()
+# calculate L_ca and L_co
+L_ca <- L_causal(t(X),t(Y),500)
+L_co <- L_confounded(t(X),t(Y),500)
+confidence <- (L_co - L_ca) / max(L_co, L_ca)
+# compute running time
+end_time <- Sys.time()
+T1 <- end_time - start_time
+# print the system time for computing MDL scores
+print(T1)
+# output decision
+if (confidence < 0)
+{
+  decision <- "Confounded"
+} else
+{
+  decision <- "Causal"
+}
+cat("Decision:", decision, " ; Confidence Score:", round(confidence,digits=4))
+```
+
+
+## Confounding Strength
+
+```{r Log Density, include=TRUE}
+LLF <- function(theta, a_uni, Sigma_XX_inv)
+{
+  m <- nrow(Sigma_XX_inv)
+  R <- diag(m) + theta*Sigma_XX_inv
+  inner_prod <- t(a_uni) %*% solve(R) %*% a_uni
+  inner_prod <- inner_prod[1,1]
+  llf <- log(det(R)) - m*log(inner_prod)
+  return(llf/2)
+}
+```
+
+
+```{r beta, include=TRUE}
+# start timing
+start_time <- Sys.time()
+Sigma_XY <- cor(X,Y)
+Sigma_XX <- var(X)
+Sigma_XX_inv <- solve(Sigma_XX)
+a_brev <- Sigma_XX_inv %*% Sigma_XY
+a_uni <- a_brev / sqrt(t(a_brev)%*%a_brev)[1,1]
+theta <- seq(0,100,0.2)
+llf <- rep(0,length(theta))
+for (i in 1:length(theta))
+{
+  llf[i] <- LLF(theta[i],a_uni,Sigma_XX_inv)
+}
+plot(theta,llf,ylab="log density",col="darkolivegreen")
+theta0 <- theta[which.max(theta)]
+beta <- mean(diag(Sigma_XX_inv)) * theta0
+beta <- beta / (beta + 1)
+end_time <- Sys.time()
+# print the system time for computing beta
+T2 <- end_time - start_time
+print(T2)
+# print beta
+cat("Confounding Strength:", round(beta,digits=4))
+```
+
