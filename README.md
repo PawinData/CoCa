@@ -1,7 +1,7 @@
 # CoCa
 A Brief Discussion of Telling Causal fromConfounded for Continuous Observational Data
 
-This fold contains data and results concerning the course essay for Information Theoretic Data Mining at LIACS, Leiden University.
+This fold contains data and results concerning the course essay for Information Theoretic Data Mining (Fall 2019) at LIACS, Leiden University.
 
 (1) To read the essay, go to Essay.pdf
 
